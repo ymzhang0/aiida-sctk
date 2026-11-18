@@ -27,6 +27,15 @@ class PolarizabilityWorkChain(ProtocolMixin, WorkChain):
     @classmethod
     def define(cls, spec):
         super().define(spec)
+        cls.define_common(spec)
+        spec.expose_outputs(SCTKBaseWorkChain, namespace='sctk')
+        spec.outline(cls.setup, cls.run_scf, cls.inspect_scf,
+                     cls.run_nscf, cls.inspect_nscf, cls.run_dos, cls.inspect_dos,
+                     cls.run_twin, cls.inspect_twin, cls.run_sctk, cls.results)
+
+    @classmethod
+    def define_common(cls, spec):
+        """Inputs, DOS outputs and exit codes shared with the work chains derived from this one."""
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('twin_mesh', valid_type=orm.KpointsData, validator=validate_twin_mesh,
                    help='Uniform mesh and offset used to construct the doubled SCTK twin grid.')
@@ -38,11 +47,7 @@ class PolarizabilityWorkChain(ProtocolMixin, WorkChain):
         spec.expose_inputs(DosCalculation, namespace='dos', exclude=['parent_folder'])
         spec.expose_inputs(SCTKBaseWorkChain, namespace='sctk',
                            exclude=['sctk.parent_folder', 'sctk.dense_parent_folder'])
-        spec.expose_outputs(SCTKBaseWorkChain, namespace='sctk')
         spec.expose_outputs(DosCalculation, namespace='dos')
-        spec.outline(cls.setup, cls.run_scf, cls.inspect_scf,
-                     cls.run_nscf, cls.inspect_nscf, cls.run_dos, cls.inspect_dos,
-                     cls.run_twin, cls.inspect_twin, cls.run_sctk, cls.results)
         spec.exit_code(401, 'ERROR_SCF', message='SCF step failed.')
         spec.exit_code(402, 'ERROR_NSCF', message='NSCF step failed.')
         spec.exit_code(403, 'ERROR_DOS', message='DOS step failed.')

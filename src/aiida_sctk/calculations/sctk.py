@@ -13,7 +13,8 @@ class SCTKCalculation(NamelistsCalculation):
                          ('CONTROL', 'outdir', './out/'),
                          ('CONTROL', 'calculation', 'kel'),
                          ('CONTROL', 'restart_mode', 'from_scratch')]
-    _internal_retrieve_list = ['aiida.pi0_head.dat', 'aiida.ixc_pi0_head.dat']
+    _internal_retrieve_list = ['aiida.pi0_head.dat', 'aiida.ixc_pi0_head.dat',
+                               'aiida.chis_head.dat', 'aiida.pi0_block.dat']
 
     @classmethod
     def define(cls, spec):
@@ -26,6 +27,13 @@ class SCTKCalculation(NamelistsCalculation):
         spec.output('output_parameters', valid_type=orm.Dict)
         spec.output('polarizability', valid_type=orm.SinglefileData)
         spec.output('ixc_polarizability', valid_type=orm.SinglefileData, required=False)
+        spec.output('spin_susceptibility', valid_type=orm.SinglefileData, required=False,
+                    help='Head of chi_s = chi0 (1 - I_xc chi0)^-1 (aiida.chis_head.dat), written when lsf=1.')
+        spec.output('polarizability_block', valid_type=orm.SinglefileData, required=False,
+                    help='chi0_GG\' block for the smallest G vectors (aiida.pi0_block.dat).')
+        spec.output('kernel', valid_type=orm.ArrayData, required=False,
+                    help='Fermi-surface averaged Coulomb and spin-fluctuation kernels N(0)<K(q, i nu)> '
+                         'and the Stoner eigenvalue for every computed q point, parsed from stdout.')
         spec.exit_code(320, 'ERROR_SCTK_FAILED', message='SCTK reported a fatal error.')
         spec.exit_code(321, 'ERROR_POLARIZABILITY_MISSING', message='No pi0 head output was produced.')
 

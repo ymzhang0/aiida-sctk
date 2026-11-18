@@ -7,7 +7,7 @@ version = "0.1.0"
 description = "AiiDA workflows for SCTK polarizability"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["aiida-core>=2.8,<3", "aiida-quantumespresso>=4.10,<6"]
+dependencies = ["aiida-core>=2.8,<3", "aiida-quantumespresso>=4.10,<6", "spglib>=2"]
 [project.optional-dependencies]
 tests = ["aiida-core[tests]>=2.8,<3", "pytest>=7"]
 [project.entry-points."aiida.calculations"]
@@ -17,6 +17,7 @@ tests = ["aiida-core[tests]>=2.8,<3", "pytest>=7"]
 [project.entry-points."aiida.workflows"]
 "sctk.base" = "aiida_sctk.workflows.base:SCTKBaseWorkChain"
 "sctk.polarizability" = "aiida_sctk.workflows.polarizability:PolarizabilityWorkChain"
+"sctk.spin_fluctuation" = "aiida_sctk.workflows.spin_fluctuation:SpinFluctuationWorkChain"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aiida_sctk"]
 [tool.pytest.ini_options]

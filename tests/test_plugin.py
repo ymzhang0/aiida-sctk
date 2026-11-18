@@ -168,3 +168,74 @@ def test_pw_wiring(aiida_profile, stage, calculation):
         assert captured['kpoints'] is points
         assert params['SYSTEM']['la2f'] is False
     assert parameters.get_dict() == {'SYSTEM':{'nbnd':20}, 'CONTROL':{}}
+
+
+def _kel_text():
+    from pathlib import Path
+    return (Path(__file__).parent / 'files' / 'kel_V_q4_shifted.out').read_text()
+
+
+def test_parse_kel_stdout():
+    """Stoner eigenvalues and averaged kernels of a real bcc V run (4x4x4 shifted q grid)."""
+    import numpy as np
+    from aiida_sctk.parsers.sctk import build_kernel_array, parse_kel_stdout
+
+    parsed = parse_kel_stdout(_kel_text())
+    assert parsed['q_grid'] == [4, 4, 4] and parsed['q_shift'] == [1, 1, 1]
+    assert parsed['number_of_qpoints'] == 6 and len(parsed['qpoints_cartesian']) == 6
+    assert [e['index'] for e in parsed['computed_qpoints']] == [1, 2, 3, 4, 5, 6]
+    assert [e['eig_max'] for e in parsed['computed_qpoints']] == pytest.approx(
+        [0.63725, 0.70330, 0.68400, 0.77160, 0.77382, 0.73520])
+    kernel = build_kernel_array(parsed)
+    assert kernel.get_array('frequencies').shape == (8,)
+    assert np.isfinite(kernel.get_array('frequencies')).all()
+    assert kernel.get_array('mu_spin_fluctuation').shape == (6, 8)
+    assert kernel.get_array('mu_spin_fluctuation')[0, 0] == pytest.approx(0.8865)
+    assert kernel.get_array('mu_coulomb')[0, 1] == pytest.approx(0.9418)
+    assert kernel.get_array('mu_coulomb_infinite_frequency')[0] == pytest.approx(15.71)
+
+
+def test_irreducible_qpoints_and_split():
+    """spglib counts agree with what sctk.x reported on LUMI for the same grids."""
+    from ase.build import bulk
+    from ase import Atoms
+    from aiida_sctk.workflows.functions import count_irreducible_qpoints, split_qpoints
+
+    vanadium = orm.StructureData(ase=bulk('V', 'bcc', a=2.99723))
+    assert count_irreducible_qpoints(vanadium, [4, 4, 4], [1, 1, 1]) == 6
+    a = 6.3226
+    half_heusler = orm.StructureData(ase=Atoms(
+        'HfSbRu', cell=[[0, a/2, a/2], [a/2, 0, a/2], [a/2, a/2, 0]], pbc=True,
+        positions=[[0, 0, 0], [a/2, 0, 0], [a/4, a/4, a/4]]))
+    assert count_irreducible_qpoints(half_heusler, [6, 6, 6], [0, 0, 0]) == 16
+    assert split_qpoints(2, 16, 4) == [[2, 5], [6, 9], [10, 13], [14, 16]]
+    assert split_qpoints(1, 6, 10) == [[1, 6]]
+    with pytest.raises(ValueError):
+        split_qpoints(3, 2, 1)
+
+
+def test_merge_kel_kernels():
+    import numpy as np
+    from aiida_sctk.parsers.sctk import build_kernel_array, parse_kel_stdout
+    from aiida_sctk.workflows.functions import merge_kel_kernels
+
+    parsed = parse_kel_stdout(_kel_text())
+    first, second = dict(parsed), dict(parsed)
+    first['computed_qpoints'] = parsed['computed_qpoints'][3:]
+    second['computed_qpoints'] = parsed['computed_qpoints'][:3]
+    merged = merge_kel_kernels(a=build_kernel_array(first), b=build_kernel_array(second))
+    full = build_kernel_array(parsed)
+    assert merged.get_array('qpoint_indices').tolist() == [1, 2, 3, 4, 5, 6]
+    for name in ('eig_max', 'mu_coulomb', 'mu_spin_fluctuation', 'mu_coulomb_infinite_frequency'):
+        assert np.allclose(merged.get_array(name), full.get_array(name))
+    with pytest.raises(Exception):
+        merge_kel_kernels(a=build_kernel_array(first), b=build_kernel_array(first))
+
+
+def test_spin_fluctuation_entry_point():
+    spec = WorkflowFactory('sctk.spin_fluctuation').spec()
+    assert 'qpoints_per_job' in spec.inputs and 'q_ranges' in spec.inputs
+    assert 'kernel' in spec.outputs and 'sctk' not in spec.outputs
+    assert spec.exit_codes.ERROR_QPOINT_COVERAGE.status == 406
+    calc_spec = CalculationFactory('sctk.kel').spec()
+    assert 'kernel' in calc_spec.outputs and 'spin_susceptibility' in calc_spec.outputs

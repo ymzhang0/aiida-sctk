@@ -1,7 +1,9 @@
 """SCF -> dense NSCF -> DOS -> twin bands -> SCTK kel split over the irreducible q points."""
+from collections.abc import Mapping
 from copy import deepcopy
 
 from aiida import orm
+from aiida.common import AttributeDict
 from aiida.engine import append_
 
 from aiida_sctk.workflows.base import SCTKBaseWorkChain
@@ -19,6 +21,13 @@ def validate_q_ranges(value, _):
                          or r[0] < 1 or r[1] < r[0] for r in ranges):
         return 'q_ranges must be a non-empty list of [start_q, last_q] pairs with 1 <= start_q <= last_q'
     return None
+
+
+def _copy_namespace(namespace):
+    """Copy the nested input dictionaries without cloning the (stored) nodes they hold."""
+    if isinstance(namespace, Mapping):
+        return AttributeDict({key: _copy_namespace(value) for key, value in namespace.items()})
+    return namespace
 
 
 class SpinFluctuationWorkChain(PolarizabilityWorkChain):
@@ -83,7 +92,7 @@ class SpinFluctuationWorkChain(PolarizabilityWorkChain):
         self.ctx.q_ranges, self.ctx.expected_qpoints, self.ctx.first_q = ranges, expected, first
         self.report(f'submitting {len(ranges)} kel job(s) for q ranges {ranges}')
         for start, last in ranges:
-            inputs = deepcopy(base)
+            inputs = _copy_namespace(base)
             job_params = deepcopy(params)
             job_params['KEL'].update(start_q=start, last_q=last)
             inputs['sctk']['parameters'] = orm.Dict(dict=job_params)

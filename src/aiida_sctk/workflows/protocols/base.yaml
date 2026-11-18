@@ -1,0 +1,42 @@
+default_inputs:
+    clean_workdir: False
+    max_iterations: 5
+    sctk:
+        metadata:
+            options:
+                max_wallclock_seconds: 43200
+                withmpi: True
+        parameters:
+            CONTROL: {}
+            KEL:
+                start_q: 2
+                nci: 5
+                laddxc: 0
+                lsf: 1
+                ecutfock: 20.0
+                nq1: 4
+                nq2: 4
+                nq3: 4
+default_protocol: balanced
+protocols:
+    balanced:
+        description: 'Protocol for an SCTK polarizability calculation at moderate accuracy and cost.'
+    stringent:
+        description: 'Protocol for an SCTK polarizability calculation at higher accuracy and cost.'
+        sctk:
+            parameters:
+                KEL:
+                    ecutfock: 30.0
+                    nq1: 6
+                    nq2: 6
+                    nq3: 6
+    fast:
+        description: 'Protocol for a low-cost SCTK polarizability calculation intended for testing.'
+        sctk:
+            parameters:
+                KEL:
+                    ecutfock: 10.0
+                    nq1: 2
+                    nq2: 2
+                    nq3: 2
+meta_inputs_schema: {}

@@ -1,0 +1,79 @@
+default_inputs:
+    twin_mesh:
+        mesh: [4, 4, 4]
+        offset: [0.0, 0.0, 0.0]
+    scf:
+        pw:
+            parameters:
+                CONTROL:
+                    calculation: scf
+    nscf:
+        kpoints_distance: 0.10
+        pw:
+            parameters:
+                CONTROL:
+                    calculation: nscf
+                SYSTEM:
+                    occupations: tetrahedra_opt
+                ELECTRONS:
+                    diagonalization: cg
+    twin:
+        pw:
+            parameters:
+                CONTROL:
+                    calculation: bands
+                ELECTRONS:
+                    diagonalization: cg
+    dos:
+        parameters:
+            DOS:
+                emin: 0.0
+                emax: 30.0
+                deltae: 0.01
+                bz_sum: tetrahedra_opt
+        metadata:
+            options:
+                max_wallclock_seconds: 43200
+                withmpi: True
+    sctk: {}
+default_protocol: balanced
+protocols:
+    balanced:
+        description: 'Protocol for the full SCTK polarizability workflow at moderate accuracy and cost.'
+        scf:
+            kpoints_distance: 0.15
+    stringent:
+        description: 'Protocol for the full SCTK polarizability workflow at higher accuracy and cost.'
+        twin_mesh:
+            mesh: [6, 6, 6]
+        scf:
+            kpoints_distance: 0.10
+        nscf:
+            kpoints_distance: 0.05
+    fast:
+        description: 'Protocol for a low-cost full SCTK polarizability workflow intended for testing.'
+        twin_mesh:
+            mesh: [2, 2, 2]
+        scf:
+            kpoints_distance: 0.30
+        nscf:
+            kpoints_distance: 0.30
+meta_inputs_schema:
+    twin_mesh:
+        mesh:
+        offset:
+    scf:
+        meta_parameters:
+            conv_thr_per_atom:
+            etot_conv_thr_per_atom:
+        pseudo_family:
+    nscf:
+        meta_parameters:
+            conv_thr_per_atom:
+            etot_conv_thr_per_atom:
+        pseudo_family:
+    twin:
+        meta_parameters:
+            conv_thr_per_atom:
+            etot_conv_thr_per_atom:
+        pseudo_family:

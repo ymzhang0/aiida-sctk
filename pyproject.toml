@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "aiida-sctk"
+version = "0.1.0"
+description = "AiiDA workflows for SCTK polarizability"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["aiida-core>=2.8,<3", "aiida-quantumespresso>=4.10,<6"]
+[project.optional-dependencies]
+tests = ["aiida-core[tests]>=2.8,<3", "pytest>=7"]
+[project.entry-points."aiida.calculations"]
+"sctk.kel" = "aiida_sctk.calculations.sctk:SCTKCalculation"
+[project.entry-points."aiida.parsers"]
+"sctk.kel" = "aiida_sctk.parsers.sctk:SCTKParser"
+[project.entry-points."aiida.workflows"]
+"sctk.base" = "aiida_sctk.workflows.base:SCTKBaseWorkChain"
+"sctk.polarizability" = "aiida_sctk.workflows.polarizability:PolarizabilityWorkChain"
+[tool.hatch.build.targets.wheel]
+packages = ["src/aiida_sctk"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]

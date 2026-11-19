@@ -239,3 +239,47 @@ def test_spin_fluctuation_entry_point():
     assert spec.exit_codes.ERROR_QPOINT_COVERAGE.status == 406
     calc_spec = CalculationFactory('sctk.kel').spec()
     assert 'kernel' in calc_spec.outputs and 'spin_susceptibility' in calc_spec.outputs
+
+
+def test_parse_head_files():
+    """Head files of a real bcc V run: file, path and text input give the same result."""
+    import numpy as np
+    from pathlib import Path
+    from aiida_sctk.parsers.raw import parse_head_file, parse_kel_stdout
+
+    folder = Path(__file__).parent / 'files'
+    pi0 = parse_head_file(folder / 'kel_V_q4_shifted.pi0_head.dat')
+    assert [b['index'] for b in pi0['qpoints']] == [1, 2, 3] and not pi0['real_frequency']
+    assert pi0['qpoints'][0]['q_crystal'] == pytest.approx([0.125, 0.125, 0.125])
+    assert len(pi0['qpoints'][0]['values']) == 8 and len(pi0['qpoints'][0]['values'][0]) == 2
+    assert pi0['qpoints'][0]['frequency_ry'][0] == 0.0
+    text = (folder / 'kel_V_q4_shifted.chis_head.dat').read_text()
+    with open(folder / 'kel_V_q4_shifted.chis_head.dat') as handle:
+        assert parse_head_file(handle) == parse_head_file(text)
+    chis = parse_head_file(text)
+    assert all(b['channel'] == 2 for b in chis['qpoints'])
+    ixc = parse_head_file(folder / 'kel_V_q4_shifted.ixc_pi0_head.dat')
+    assert len(ixc['qpoints'][0]['values'][0]) == 1
+    # consistency of the three heads at the static point is not exact (matrix inverse), only the signs
+    assert pi0['qpoints'][0]['values'][0][-1].real < 0 and chis['qpoints'][0]['values'][0][-1].real < 0
+    assert ixc['qpoints'][0]['values'][0][-1].real == pytest.approx(0.4572138)
+    assert abs(chis['qpoints'][0]['values'][0][-1].real) > abs(pi0['qpoints'][0]['values'][0][-1].real)
+    assert parse_kel_stdout(folder / 'kel_V_q4_shifted.out') == parse_kel_stdout(_kel_text())
+
+
+def test_head_arrays_in_kernel():
+    import numpy as np
+    from pathlib import Path
+    from aiida_sctk.parsers.sctk import add_head_arrays, build_kernel_array
+    from aiida_sctk.parsers.raw import parse_head_file, parse_kel_stdout
+
+    folder = Path(__file__).parent / 'files'
+    kernel = build_kernel_array(parse_kel_stdout(_kel_text()))
+    heads = {name: parse_head_file(folder / f'kel_V_q4_shifted.{name}.dat') for name in ('pi0_head', 'chis_head')}
+    add_head_arrays(kernel, heads)        # the sample head files cover q 1-3 only, the stdout sample q 1-6
+    assert 'pi0_head' not in kernel.get_arraynames()
+    for block in heads['pi0_head']['qpoints'] + heads['chis_head']['qpoints']:
+        block['index'] += 0
+    kernel.set_array('qpoint_indices', np.array([1, 2, 3]))
+    add_head_arrays(kernel, heads)
+    assert kernel.get_array('pi0_head').shape == (3, 8) and np.iscomplexobj(kernel.get_array('chis_head'))

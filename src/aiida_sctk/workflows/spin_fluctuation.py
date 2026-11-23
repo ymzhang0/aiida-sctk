@@ -23,6 +23,27 @@ def validate_q_ranges(value, _):
     return None
 
 
+def validate_commensurate_grids(inputs, _):
+    """The dense nscf k grid must contain k + q for every q of the twin (q) grid.
+
+    sctk.x takes the band energies at k + q from the dense nscf grid by rounding q to the nearest grid point
+    (fermi_factor in sctk_coulomb.f90).  If q is not a point of that grid the energies belong to a different q than
+    the matrix elements: the run finishes without error and the kernels are wrong.  Per direction the k grid must
+    therefore be a multiple of the q grid, and of twice the q grid where the q grid has a half-grid shift.
+    """
+    try:
+        q_mesh, offset = inputs['twin_mesh'].get_kpoints_mesh()
+        k_mesh, _ = inputs['nscf']['kpoints'].get_kpoints_mesh()
+    except (KeyError, AttributeError):
+        return None  # no explicit meshes to compare (e.g. a k-point distance is used)
+    required = [q * (2 if abs(shift) > 1e-8 else 1) for q, shift in zip(q_mesh, offset)]
+    bad = [i for i in range(3) if k_mesh[i] % required[i]]
+    if bad:
+        return (f'nscf k grid {list(k_mesh)} is not commensurate with the q grid {list(q_mesh)} (offset {list(offset)}): '
+                f'it must be a multiple of {required}')
+    return None
+
+
 def _copy_namespace(namespace):
     """Copy the nested input dictionaries without cloning the (stored) nodes they hold."""
     if isinstance(namespace, Mapping):
@@ -52,6 +73,7 @@ class SpinFluctuationWorkChain(PolarizabilityWorkChain):
                    help='Explicit inclusive [start_q, last_q] ranges, one kel job each (overrides `qpoints_per_job`).')
         spec.input('skip_gamma', valid_type=orm.Bool, default=lambda: orm.Bool(True),
                    help='Skip q = Gamma (the first q point of an unshifted grid).')
+        spec.inputs.validator = validate_commensurate_grids
         spec.output('kernel', valid_type=orm.ArrayData,
                     help='Merged per-q arrays: qpoint_indices, frequencies [Ry], eig_max, dos_ef, '
                          'mu_coulomb and mu_spin_fluctuation (q, frequency).')

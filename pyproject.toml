@@ -18,6 +18,8 @@ tests = ["aiida-core[tests]>=2.8,<3", "pytest>=7"]
 "sctk.base" = "aiida_sctk.workflows.base:SCTKBaseWorkChain"
 "sctk.polarizability" = "aiida_sctk.workflows.polarizability:PolarizabilityWorkChain"
 "sctk.spin_fluctuation" = "aiida_sctk.workflows.spin_fluctuation:SpinFluctuationWorkChain"
+[project.entry-points."aiida_mcp.tools"]
+sctk = "aiida_sctk.mcp:tools"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aiida_sctk"]
 [tool.pytest.ini_options]

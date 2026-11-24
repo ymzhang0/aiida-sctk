@@ -101,6 +101,58 @@ def average_kernels(node) -> KernelAverage:
         eig_max=arrays['eig_max'], weights=w, bz_fraction=float(w_all[idx].sum() / w_all.sum()))
 
 
+def write_epw_qtable(node, path) -> dict:
+    """Write the per-q kernels of a ``sctk.spin_fluctuation`` work chain as EPW's per-q table (``fila2f_sf``).
+
+    EPW does the star-weighted q average itself (header word ``qtable``).  Format, free format::
+
+        # qtable imag ...                         header
+        nq  nfreq
+        nu(1:nfreq)                               [meV], nu(1) = 0
+        per q point:  xq(1:3) (crystal)  w_q  lambda_sf(inf)  mu_C(inf)
+                      lambda_sf(q, nu(1:nfreq))
+                      mu_C(q, nu(1:nfreq))
+
+    ``w_q`` is the multiplicity of the star of the q point (spglib, as in :func:`star_weights`); EPW cannot
+    compute it in this mode because it does not load the structure.  Returns a short summary.
+    """
+    from aiida import orm
+
+    node = orm.load_node(node) if not isinstance(node, orm.Node) else node
+    if 'kernel' not in node.outputs:
+        raise ValueError(f'process {node.pk} has no merged kernel output')
+    kernel = node.outputs.kernel
+    par = node.outputs.output_parameters.get_dict()
+    names = kernel.get_arraynames()
+    need = ('qpoint_indices', 'mu_spin_fluctuation', 'mu_coulomb', 'mu_coulomb_infinite_frequency')
+    missing = [n for n in need if n not in names]
+    if missing:
+        raise ValueError(f'kernel output of {node.pk} lacks {missing}')
+    idx = kernel.get_array('qpoint_indices') - 1
+    w_all = star_weights(node.inputs.structure, par['q_grid'], par['q_shift'], par['qpoints_cartesian'])
+    qcart = np.array(par['qpoints_cartesian'], float)
+    atoms = node.inputs.structure.get_ase(); cell = atoms.get_cell().array; alat = np.linalg.norm(cell[0])
+    frac = qcart @ cell.T / alat
+    nu = kernel.get_array('frequencies') * RY * 1000.0       # Ry -> meV
+    sf = kernel.get_array('mu_spin_fluctuation'); mc = kernel.get_array('mu_coulomb')
+    cinf = kernel.get_array('mu_coulomb_infinite_frequency')
+    sfinf = kernel.get_array('mu_spin_fluctuation_infinite_frequency') if 'mu_spin_fluctuation_infinite_frequency' in names \
+        else np.zeros(len(idx))
+    with open(path, 'w') as handle:
+        handle.write(f'# qtable imag  SCTK per-q Fermi-surface averaged kernels, work chain {node.pk} {node.uuid}, '
+                     f'laddxc = {_laddxc(node)}\n')
+        handle.write(f'{len(idx)} {len(nu)}\n')
+        handle.write(' '.join(f'{x:.6f}' for x in nu) + '\n')
+        for i, iq in enumerate(idx):
+            handle.write(' '.join(f'{x:.10f}' for x in frac[iq]) + f' {w_all[iq]:.1f} {sfinf[i]:.8e} {cinf[i]:.8e}\n')
+            handle.write(' '.join(f'{x:.8e}' for x in sf[i]) + '\n')
+            handle.write(' '.join(f'{x:.8e}' for x in mc[i]) + '\n')
+    w = w_all[idx]
+    return {'nq': int(len(idx)), 'nfreq': int(len(nu)), 'max_freq_ev': float(nu[-1] / 1000),
+            'lambda_sf_0': float(w @ sf[:, 0] / w.sum()), 'mu_c_0': float(w @ mc[:, 0] / w.sum()),
+            'mu_c_inf': float(w @ cinf / w.sum()), 'weights': w.tolist()}
+
+
 def _laddxc(node) -> int | None:
     try:
         return node.inputs.sctk.sctk.parameters.get_dict()['KEL']['laddxc']

@@ -82,7 +82,8 @@ with pf.style('single'), plt.rc_context({'svg.fonttype': 'path'}):
     M = np.array([[abs(IG[tuple((a - b) % np.array([n1, n2, n3]))]) for b in ms] for a in ms])
     # vector cells, not an embedded bitmap: the web document drops bitmaps embedded in an SVG (the panel came out empty)
     image = axes[1].pcolormesh(np.arange(28) - 0.5, np.arange(28) - 0.5, np.log10(np.maximum(M, 1e-6)), cmap='magma', rasterized=False, linewidth=0); axes[1].set_aspect('equal')
-    cb = figure.colorbar(image, ax=axes[1]); cb.set_label(r'$\log_{10}|I_{\mathbf{G}\mathbf{G}^\prime}|$ (eV)')
+    cb = figure.colorbar(image, ax=axes[1]); cb.solids.set_rasterized(False)   # matplotlib rasterises long colour bars; the web document drops bitmaps
+    cb.set_label(r'$\log_{10}|I_{\mathbf{G}\mathbf{G}^\prime}|$ (eV)')
     axes[1].set_xlabel(r"$\mathbf{G}'$ index (27 shortest)"); axes[1].set_ylabel(r'$\mathbf{G}$ index')
     axes[1].text(0.04, 0.93, f'(b) {name}', transform=axes[1].transAxes, color='white', va='top')
     save(figure, 'kernel_reciprocal_space')
